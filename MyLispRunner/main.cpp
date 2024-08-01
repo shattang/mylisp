@@ -11,11 +11,11 @@ int main() {
     // conditional, and function call
     std::string myLispScript = R"(
     (define factorial (lambda (n) (if (< n 2) 1 (* n (factorial (- n 1))))))
-    (let x 5)
+    (let x 5)  ; what a lovely day
     (let x 15.001)
     (let x -15.001)
     (let x +15.001)
-    (+ 17.001 -0.01)
+    (+.001 -.01 .05 0.0.1)
     (for i 0 10 -1 
         (let x (+ x 1)))
     (if (> x 0)
