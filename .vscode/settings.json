@@ -1,0 +1,9 @@
+{
+    "C_Cpp.default.compilerPath": "cl.exe",
+    "files.associations": {
+        "string": "cpp",
+        "vector": "cpp",
+        "cctype": "cpp"
+    },
+    "cmake.configureOnOpen": true
+}
