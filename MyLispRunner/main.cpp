@@ -4,30 +4,43 @@
 
 using namespace Shattang::MyLisp;
 
-int main() {
-    Lexer lexer;
-
-    // Example MyLisp script with a function definition, variable assignment, 
+int main()
+{
+    // Example MyLisp script with a function definition, variable assignment,
     // conditional, and function call
     std::string myLispScript = R"(
-    (define factorial (lambda (n) (if (< n 2) 1 (* n (factorial (- n 1))))))
-    (let x 5)  ; what a lovely day
-    (let x 15.001)
-    (let x -15.001)
-    (let x +15.001)
-    (+.001 -.01 .05 0.0.1)
-    (for i 0 10 -1 
-        (let x (+ x 1)))
-    (if (> x 0)
-        (print (factorial x))
-        (print "x is not positive"))
-    )"; 
+        ;; Define the numbers using make-vector
+        (define numbers (make-vector 3.0E-50 7.2 5.8 6.1 8.0 4.4 5.9 6.8 7.3 4))
 
-    std::vector<Token> tokens = lexer.Tokenize(myLispScript);
+        ;; Function to calculate the mean
+        (define (mean nums)
+            (divide (reduce add 0 nums) (length nums))
+        )
+
+        ;; Function to calculate the variance
+        (define (variance nums avg)
+            (reduce add 0 (map (lambda (x) (multiply (subtract x avg) (subtract x avg))) nums))
+        )
+
+        ;; Calculate the mean
+        (define avg? (mean numbers))
+
+        ;; Calculate the variance
+        (define varianceSum (divide (variance numbers avg) (length numbers)))
+
+        ;; Calculate the standard deviation
+        (define stdDev (sqrt varianceSum))
+
+        ;; Print result
+        (print "Standard Deviation:" stdDev)
+        )";
+
+    std::vector<Token> tokens = Tokenize(myLispScript);
 
     // Print the tokens
     std::cout << "Tokens:\n";
-    for (const Token& token : tokens) {
+    for (const Token &token : tokens)
+    {
         std::cout << token.ToString() << "\n";
     }
 

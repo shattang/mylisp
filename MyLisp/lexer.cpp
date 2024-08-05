@@ -1,5 +1,7 @@
 #include <Shattang/MyLisp/lexer.h>
+
 #include <cctype>
+#include <sstream>
 
 namespace Shattang::MyLisp
 {
@@ -11,38 +13,22 @@ namespace Shattang::MyLisp
             return "OPEN_PAREN";
         case TokenType::CLOSE_PAREN:
             return "CLOSE_PAREN";
-        case TokenType::QUOTE:
-            return "QUOTE";
         case TokenType::SYMBOL:
             return "SYMBOL";
-        case TokenType::NUMBER:
-            return "NUMBER";
+        case TokenType::FLOAT:
+            return "FLOAT";
+        case TokenType::INTEGER:
+            return "INTEGER";
+        case TokenType::BOOL_FALSE:
+            return "BOOL_FALSE";
+        case TokenType::BOOL_TRUE:
+            return "BOOL_TRUE";
         case TokenType::STRING:
             return "STRING";
         case TokenType::ERROR:
             return "ERROR";
-        case TokenType::LT:
-            return "LT";
-        case TokenType::GT:
-            return "GT";
-        case TokenType::EQ:
-            return "EQ";
-        case TokenType::LEQ:
-            return "LEQ";
-        case TokenType::GEQ:
-            return "GEQ";
-        case TokenType::NEQ:
-            return "NEQ";
-        case TokenType::PLUS:
-            return "PLUS";
-        case TokenType::MINUS:
-            return "MINUS";
-        case TokenType::STAR:
-            return "STAR";
-        case TokenType::SLASH:
-            return "SLASH";
-        case TokenType::PERCENT:
-            return "PERCENT";
+        case TokenType::END_OF_FILE:
+            return "EOF";
         // Add cases for other token types
         default:
             return "UNKNOWN";
@@ -51,218 +37,242 @@ namespace Shattang::MyLisp
 
     std::string Token::ToString() const
     {
-        std::string str = "Type: " + TokenTypeToString(type) +
-                          ", Value: '" + value + "'" +
-                          ", Line: " + std::to_string(line) +
-                          ", Column: " + std::to_string(column);
-        return str;
+        std::ostringstream oss;
+        oss << "Type: " << TokenTypeToString(type)
+            << ", Value: " << value
+            << ", Line: " << line
+            << ", Column: " << column;
+
+        if (!error.empty())
+        {
+            oss << ", Error: " << error;
+        }
+
+        return oss.str();
     }
 
-    void tokenizeNumber(const std::string &input, size_t &i, int line, int& column, std::vector<Token> &tokens)
+    inline void advance(size_t &i, int &column)
     {
-        std::string value(1, input[i]);
-        bool hasDecimal = (input[i] == '.');
-        int startColumn = column; // Store the starting column of the number
+        ++i;
+        ++column;
+    }
 
-        while (i + 1 < input.length() && (std::isdigit(input[i + 1]) || input[i + 1] == '.'))
+    Token Lexer::GetNextToken()
+    {
+        while (index_ < input_.length())
         {
-            // Check for multiple decimal points
-            if (input[i + 1] == '.' && hasDecimal)
+            char currentChar = input_[index_];
+
+            if (std::isspace(currentChar))
             {
-                value += input[++i];
-
-                // Consume the rest of the invalid number
-                while (i + 1 < input.length() && (std::isdigit(input[i + 1]) || input[i + 1] == '.'))
-                {
-                    value += input[++i];
-                }
-
-                // Create the ERROR token with a concatenated error message
-                std::string errorMessage = "Invalid number: multiple decimal points in '" + value + "'";
-                tokens.push_back({TokenType::ERROR, errorMessage, line, startColumn}); // Use startColumn
-                return;                                                                // Exit the function early on error
+                handleWhitespace();
+                continue;
             }
-            if (input[i + 1] == '.')
+
+            if (currentChar == ';')
+            { // Assuming comments start with a semicolon
+                handleComment();
+                continue;
+            }
+
+            if (currentChar == '(')
+                return makeToken(TokenType::OPEN_PAREN);
+            if (currentChar == ')')
+                return makeToken(TokenType::CLOSE_PAREN);
+            if (std::isdigit(currentChar) || currentChar == '+' || currentChar == '-')
+            {
+                return handleNumber();
+            }
+            if (std::isalpha(currentChar))
+            {
+                return handleAlpha();
+            }
+            if (currentChar == '"')
+                return tokenizeString();
+
+            return makeErrorToken("Unknown character");
+        }
+
+        return makeEOFToken();
+    }
+
+    void Lexer::handleComment()
+    {
+        while (index_ < input_.length() && input_[index_] != '\n')
+        {
+            advance(index_, column_);
+        }
+        if (index_ < input_.length() && input_[index_] == '\n')
+        {
+            handleWhitespace(); // Handle newline to update line number
+        }
+    }
+
+    void Lexer::handleWhitespace()
+    {
+        if (input_[index_] == '\n')
+        {
+            line_++;
+            column_ = 1;
+        }
+        else
+        {
+            column_++;
+        }
+        index_++;
+    }
+
+    Token Lexer::makeToken(TokenType type)
+    {
+        Token token{type, std::string_view(&input_[index_], 1), line_, column_, ""};
+        advance(index_, column_);
+        return token;
+    }
+
+    Token Lexer::makeErrorToken(const std::string &errorMessage)
+    {
+        std::string_view errorValue(&input_[index_], 1);
+        Token errorToken{TokenType::ERROR, errorValue, line_, column_, errorMessage};
+        advance(index_, column_);
+        return errorToken;
+    }
+
+    Token Lexer::makeEOFToken()
+    {
+        return Token{TokenType::END_OF_FILE, std::string_view(nullptr, 0), line_, column_, ""};
+    }
+
+    Token Lexer::handleNumber()
+    {
+        size_t start = index_;
+        bool hasDecimal = false;
+        bool hasExponent = false;
+
+        if (input_[index_] == '+' || input_[index_] == '-')
+        {
+            advance(index_, column_);
+        }
+
+        while (index_ < input_.length())
+        {
+            char c = input_[index_];
+            if (c == '.' && !hasDecimal)
             {
                 hasDecimal = true;
+                advance(index_, column_);
             }
-            value += input[++i];
-            ++column; // Increment column for each character added to value
+            else if ((c == 'e' || c == 'E') && !hasExponent)
+            {
+                hasExponent = true;
+                advance(index_, column_);
+
+                if (index_ < input_.length() && (input_[index_] == '+' || input_[index_] == '-'))
+                {
+                    advance(index_, column_);
+                }
+                if (index_ >= input_.length() || !std::isdigit(input_[index_]))
+                {
+                    return makeErrorToken("Invalid scientific notation");
+                }
+            }
+            else if (!std::isdigit(c))
+            {
+                break;
+            }
+            else
+            {
+                advance(index_, column_);
+            }
         }
 
-        // Check for trailing decimal
-        if (value.back() == '.')
+        if (hasDecimal || hasExponent)
         {
-            std::string errorMessage = "Invalid number: trailing decimal in '" + value + "'";
-            tokens.push_back({TokenType::ERROR, errorMessage, line, startColumn}); // Use startColumn
+            return tokenizeFloat(start);
         }
         else
         {
-            tokens.push_back({TokenType::NUMBER, value, line, startColumn}); // Use startColumn
+            return tokenizeInteger(start);
         }
     }
 
-    // Function to tokenize a string
-    void tokenizeString(const std::string &input, size_t &i, int line, int column, std::vector<Token> &tokens)
+    Token Lexer::handleAlpha()
     {
-        std::string value(1, input[i]); // Include the opening quote
-        while (i + 1 < input.length() && input[i + 1] != '"')
+        size_t start = index_;
+        while (index_ < input_.length() && (std::isalnum(input_[index_]) || input_[index_] == '_' || input_[index_] == '-' || input_[index_] == '?'))
         {
-            value += input[++i];
+            advance(index_, column_);
         }
-        if (i + 1 < input.length())
+
+        std::string_view value(input_.data() + start, index_ - start);
+
+        if (value == "true")
         {
-            value += input[++i]; // Include closing quote
-            tokens.push_back({TokenType::STRING, value, line, column});
+            return Token{TokenType::BOOL_TRUE, value, line_, column_, ""};
+        }
+        else if (value == "false")
+        {
+            return Token{TokenType::BOOL_FALSE, value, line_, column_, ""};
         }
         else
         {
-            tokens.push_back({TokenType::ERROR, "Unterminated string", line, column});
+            return Token{TokenType::SYMBOL, value, line_, column_, ""};
         }
     }
 
-    // Function to tokenize a symbol
-    void tokenizeSymbol(const std::string &input, size_t &i, int line, int column, std::vector<Token> &tokens)
+    Token Lexer::tokenizeFloat(size_t start)
     {
-        std::string value(1, input[i]);
-        while (i + 1 < input.length() && (std::isalnum(input[i + 1]) || input[i + 1] == '-' || input[i + 1] == '_'))
-        {
-            value += input[++i];
-        }
-        tokens.push_back({TokenType::SYMBOL, value, line, column});
+        std::string_view value(input_.data() + start, index_ - start);
+        return Token{TokenType::FLOAT, value, line_, column_, ""};
     }
 
-    std::vector<Token> Lexer::Tokenize(const std::string &input)
+    Token Lexer::tokenizeInteger(size_t start)
+    {
+        std::string_view value(input_.data() + start, index_ - start);
+        return Token{TokenType::INTEGER, value, line_, column_, ""};
+    }
+
+    Token Lexer::tokenizeString()
+    {
+        size_t start = index_;
+        advance(index_, column_); // Skip the opening quote
+
+        while (index_ < input_.length() && input_[index_] != '"')
+        {
+            if (input_[index_] == '\n')
+            {
+                line_++;
+                column_ = 0;
+            }
+            else
+            {
+                advance(index_, column_);
+            }
+        }
+
+        if (index_ < input_.length())
+        {
+            advance(index_, column_); // Include closing quote
+            std::string_view value(input_.data() + start, index_ - start);
+            return Token{TokenType::STRING, value, line_, column_, ""};
+        }
+        else
+        {
+            return Token{TokenType::ERROR, "", line_, column_, "Unterminated string"};
+        }
+    }
+
+    std::vector<Token> Tokenize(const std::string &input)
     {
         std::vector<Token> tokens;
-        int line = 1, column = 1;
-        for (size_t i = 0; i < input.length(); ++i)
-        {
-            char c = input[i];
-            if (std::isspace(c))
-            {
-                if (c == '\n')
-                {
-                    ++line;
-                    column = 1;
-                }
-                else
-                {
-                    ++column;
-                }
-                continue;
-            }
-            if (c == ';')
-            {
-                while (i < input.length() && input[i] != '\n')
-                    ++i;
-                continue;
-            }
+        Lexer lexer(input);
+        Token token;
 
-            switch (c)
-            {
-            case '(':
-                tokens.push_back({TokenType::OPEN_PAREN, "(", line, column});
-                break;
-            case ')':
-                tokens.push_back({TokenType::CLOSE_PAREN, ")", line, column});
-                break;
-            case '\'':
-                tokens.push_back({TokenType::QUOTE, "'", line, column});
-                break;
-            case '+':
-            case '-':
-                if (i + 1 < input.length() && (std::isdigit(input[i + 1]) || input[i + 1] == '.'))
-                {
-                    tokenizeNumber(input, i, line, column, tokens);
-                }
-                else
-                {
-                    tokens.push_back({(c == '+' ? TokenType::PLUS : TokenType::MINUS), std::string(1, c), line, column});
-                }
-                break;
-            case '*':
-                tokens.push_back({TokenType::STAR, "*", line, column});
-                break;
-            case '/':
-                tokens.push_back({TokenType::SLASH, "/", line, column});
-                break;
-            case '%':
-                tokens.push_back({TokenType::PERCENT, "%", line, column});
-                break;
-            case '<':
-                if (i + 1 < input.length() && input[i + 1] == '=')
-                {
-                    tokens.push_back({TokenType::LEQ, "<=", line, column});
-                    ++i;
-                }
-                else
-                {
-                    tokens.push_back({TokenType::LT, "<", line, column});
-                }
-                break;
-            case '>':
-                if (i + 1 < input.length() && input[i + 1] == '=')
-                {
-                    tokens.push_back({TokenType::GEQ, ">=", line, column});
-                    ++i;
-                }
-                else
-                {
-                    tokens.push_back({TokenType::GT, ">", line, column});
-                }
-                break;
-            case '=':
-                if (i + 1 < input.length() && input[i + 1] == '=')
-                {
-                    tokens.push_back({TokenType::EQ, "==", line, column});
-                    ++i;
-                }
-                else
-                {
-                    tokens.push_back({TokenType::ERROR, std::string("Invalid character: ") + c, line, column});
-                }
-                break;
-            case '!':
-                if (i + 1 < input.length() && input[i + 1] == '=')
-                {
-                    tokens.push_back({TokenType::NEQ, "!=", line, column});
-                    ++i;
-                }
-                else
-                {
-                    tokens.push_back({TokenType::ERROR, std::string("Invalid character: ") + c, line, column});
-                }
-                break;
-            case '.':
-            case '0':
-            case '1':
-            case '2':
-            case '3':
-            case '4':
-            case '5':
-            case '6':
-            case '7':
-            case '8':
-            case '9':
-                tokenizeNumber(input, i, line, column, tokens);
-                break;
-            case '"':
-                tokenizeString(input, i, line, column, tokens);
-                break;
-            default:
-                if (std::isalpha(c))
-                {
-                    tokenizeSymbol(input, i, line, column, tokens);
-                }
-                else
-                {
-                    tokens.push_back({TokenType::ERROR, std::string("Invalid character: ") + c, line, column});
-                }
-                break;
-            }
-            ++column;
-        }
+        do
+        {
+            token = lexer.GetNextToken();
+            tokens.push_back(token);
+        } while (token.type != TokenType::END_OF_FILE && token.type != TokenType::ERROR);
+
         return tokens;
     }
 }
