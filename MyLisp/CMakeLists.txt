@@ -1,7 +1,8 @@
 # Create the MyLisp library
 add_library(MyLisp STATIC
 	Lexer.cpp
-    	Parser.cpp
+    Parser.cpp
+	ASTPrettyPrinter.cpp
 )
 
 # Target properties for MyLisp

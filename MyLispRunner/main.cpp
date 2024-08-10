@@ -2,6 +2,7 @@
 #include <vector>
 #include <Shattang/MyLisp/Lexer.h>
 #include <Shattang/MyLisp/Parser.h>
+#include <Shattang/MyLisp/ASTPrettyPrinter.h>
 
 using namespace Shattang::MyLisp;
 
@@ -10,43 +11,40 @@ int main()
     // Example MyLisp script with a function definition, variable assignment,
     // conditional, and function call
     std::string myLispScript = R"(
-        ;; Define the numbers using make-vector
-        (let (numbers Vector)
-            (make-vector 3.0E-50 7.2 5.8 6.1 8.0 4.4 5.9 6.8 7.3 4)
-        )
 
-        ;; Function to calculate the mean
-        (define mean ((nums Vector)) Float
-            (divide (reduce add 0 nums) (length nums))
-        )
+        (using "math")
 
-        ;; Function to calculate the variance
-        (define variance ((nums Vector) (avg Float)) Float
-            ;; Nested function to square the difference
-            (define squareDifference ((x Float)) Float
-                (multiply (subtract x avg) (subtract x avg))
+        (let (numbers DoubleVector) (import-double-vector "data_source"))
+
+        (define mean ((nums DoubleVector)) Float
+            (let (sum Float) 0)
+            (let (i Int) 0)
+            (while (less-than i (length nums))
+                (set sum (add sum (vector-ref nums i)))
+                (set i (add i 1))
             )
-            (reduce add 0 (map squareDifference nums))
+            (divide sum (length nums))
         )
 
-        ;; Calculate the mean
-        (let (avg Float)
-            (mean numbers)
+        (define variance ((nums DoubleVector) (avg Float)) Float
+            (let (squaredNums DoubleVector) (make-double-vector))
+            (for i 0 (subtract (length nums) 1) 1
+                (vector-push squaredNums (multiply (vector-ref nums i) (vector-ref nums i)))
+            )
+            (let (meanOfSquaresValue Float) (mean squaredNums))
+            (subtract meanOfSquaresValue (multiply avg avg))
         )
 
-        ;; Calculate the variance
-        (let (varianceSum Float)
-            (divide (variance numbers avg) (length numbers))
-        )
+        (let (avg Float) (mean ((numbers))))
 
-        ;; Calculate the standard deviation
-        (let (stdDev Float)
-            (sqrt varianceSum)
-        )
+        (let (varianceSum Float) (variance numbers avg))
 
-        ;; Print result
+        (let (stdDev Float) (sqrt varianceSum))
+
+        (let (overOne String) (if (greater-than stDev 1) "yes" "no"))
+
         (print "Standard Deviation:" stdDev)
-
+        (print "OverOne?" overOne)
 
         )";
 
@@ -64,7 +62,8 @@ int main()
 
     auto ast = parser.parse();
 
-    std::cout << ast->toString();
+    ASTPrettyPrinter printer(std::cout);
+    printer.print(*ast);
     
     return 0;
 }

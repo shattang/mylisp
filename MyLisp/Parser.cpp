@@ -26,6 +26,8 @@ namespace Shattang::MyLisp
             return "FUNCTION_DECLARATION";
         case NodeType::FUNCTION_CALL:
             return "FUNCTION_CALL";
+        case NodeType::VARIABLE_ASSIGNMENT:
+            return "VARIABLE_ASSIGNMENT";
         default:
             return "UNKNOWN";
         }
@@ -71,7 +73,7 @@ namespace Shattang::MyLisp
     }
 
     // BooleanNode implementation
-    BooleanNode::BooleanNode(bool value) : value(value) {}
+    BooleanNode::BooleanNode(bool value) : value_(value) {}
 
     NodeType BooleanNode::getType() const
     {
@@ -80,11 +82,11 @@ namespace Shattang::MyLisp
 
     std::string BooleanNode::toString() const
     {
-        return "Boolean: " + std::string(value ? "true" : "false");
+        return "Boolean: " + std::string(value_ ? "true" : "false");
     }
 
     // StringNode implementation
-    StringNode::StringNode(const std::string &value) : value(value) {}
+    StringNode::StringNode(const std::string &value) : value_(value) {}
 
     NodeType StringNode::getType() const
     {
@@ -93,14 +95,14 @@ namespace Shattang::MyLisp
 
     std::string StringNode::toString() const
     {
-        return "String: " + std::string(value);
+        return "String: " + std::string(value_);
     }
 
     // VariableDeclarationNode implementation
     VariableDeclarationNode::VariableDeclarationNode(const std::string &variableName,
                                                      std::unique_ptr<SymbolNode> typeNode,
                                                      std::unique_ptr<ASTNode> valueNode)
-        : variableName(variableName), typeNode(std::move(typeNode)), valueNode(std::move(valueNode)) {}
+        : variableName_(variableName), typeNode_(std::move(typeNode)), valueNode_(std::move(valueNode)) {}
 
     NodeType VariableDeclarationNode::getType() const
     {
@@ -109,9 +111,9 @@ namespace Shattang::MyLisp
 
     std::string VariableDeclarationNode::toString() const
     {
-        return "VariableDeclaration: " + variableName +
-               " of type " + typeNode->toString() +
-               " = " + valueNode->toString();
+        return "VariableDeclaration: " + variableName_ +
+               " of type " + typeNode_->toString() +
+               " = " + valueNode_->toString();
     }
 
     // FunctionDeclarationNode implementation
@@ -119,10 +121,10 @@ namespace Shattang::MyLisp
                                                      std::vector<Parameter> parameters,
                                                      std::unique_ptr<SymbolNode> returnType,
                                                      std::vector<std::unique_ptr<ASTNode>> body)
-        : functionName(functionName),
-          parameters(std::move(parameters)),
-          returnType(std::move(returnType)),
-          body(std::move(body)) {}
+        : functionName_(functionName),
+          parameters_(std::move(parameters)),
+          returnType_(std::move(returnType)),
+          body_(std::move(body)) {}
 
     NodeType FunctionDeclarationNode::getType() const
     {
@@ -132,25 +134,25 @@ namespace Shattang::MyLisp
     std::string FunctionDeclarationNode::toString() const
     {
         std::ostringstream oss;
-        oss << "FunctionDeclaration: " << functionName << "(";
-        for (const auto &param : parameters)
+        oss << "FunctionDeclaration: " << functionName_ << "(";
+        for (const auto &param : parameters_)
         {
-            oss << param.name << ": " << param.type->toString() << ", ";
+            oss << param.name_ << ": " << param.type_->toString() << ", ";
         }
-        oss << ") -> " << returnType->toString()
-            << " { ";
-        for (const auto &statement : body)
+        oss << ") -> " << returnType_->toString()
+            << " { " << "\n";
+        for (const auto &statement : body_)
         {
-            oss << "\t" << statement->toString() << "; ";
+            oss << "\t\t" << statement->toString() << ";\n";
         }
-        oss << "}";
+        oss << "\t}";
         return oss.str();
     }
 
     // FunctionCallNode implementation
     FunctionCallNode::FunctionCallNode(const std::string &functionName,
                                        std::vector<std::unique_ptr<ASTNode>> arguments)
-        : functionName(functionName), arguments(std::move(arguments)) {}
+        : functionName_(functionName), arguments_(std::move(arguments)) {}
 
     NodeType FunctionCallNode::getType() const
     {
@@ -160,8 +162,8 @@ namespace Shattang::MyLisp
     std::string FunctionCallNode::toString() const
     {
         std::ostringstream oss;
-        oss << "FunctionCall: " << functionName << "(";
-        for (const auto &arg : arguments)
+        oss << "FunctionCall: " << functionName_ << "(";
+        for (const auto &arg : arguments_)
         {
             oss << arg->toString() << ", ";
         }
@@ -190,14 +192,93 @@ namespace Shattang::MyLisp
         return oss.str();
     }
 
+    VariableAssignmentNode::VariableAssignmentNode(const std::string &variableName, std::unique_ptr<ASTNode> valueNode)
+        : variableName_(variableName), valueNode_(std::move(valueNode)) {}
+
+    NodeType VariableAssignmentNode::getType() const
+    {
+        return NodeType::VARIABLE_ASSIGNMENT;
+    }
+
+    std::string VariableAssignmentNode::toString() const
+    {
+        return "VariableAssignment: " + variableName_ + " = " + valueNode_->toString();
+    }
+
+    ForIterationNode::ForIterationNode(const std::string &index,
+                                       std::unique_ptr<ASTNode> start,
+                                       std::unique_ptr<ASTNode> end,
+                                       std::unique_ptr<ASTNode> step,
+                                       std::vector<std::unique_ptr<ASTNode>> body)
+        : index_(index), start_(std::move(start)), end_(std::move(end)), step_(std::move(step)), body_(std::move(body)) {}
+
+    NodeType ForIterationNode::getType() const
+    {
+        return NodeType::FOR_ITERATION;
+    }
+
+    std::string ForIterationNode::toString() const
+    {
+        std::ostringstream oss;
+        oss << "ForIteration: " << index_ << " from " << start_->toString() << " to " << end_->toString()
+            << " step " << step_->toString() << " { ";
+        for (const auto &expr : body_)
+        {
+            oss << expr->toString() << "; ";
+        }
+        oss << "}";
+        return oss.str();
+    }
+
+    WhileIterationNode::WhileIterationNode(std::unique_ptr<ASTNode> condition, std::vector<std::unique_ptr<ASTNode>> body)
+        : condition_(std::move(condition)), body_(std::move(body)) {}
+
+    NodeType WhileIterationNode::getType() const
+    {
+        return NodeType::WHILE_ITERATION;
+    }
+
+    std::string WhileIterationNode::toString() const
+    {
+        std::ostringstream oss;
+        oss << "WhileIteration (" << condition_->toString() << ") { ";
+        for (const auto &expr : body_)
+        {
+            oss << expr->toString() << "; ";
+        }
+        oss << "}";
+        return oss.str();
+    }
+
+    IfNode::IfNode(std::unique_ptr<ASTNode> condition,
+                   std::unique_ptr<ASTNode> thenBranch,
+                   std::unique_ptr<ASTNode> elseBranch)
+        : condition_(std::move(condition)),
+          thenBranch_(std::move(thenBranch)),
+          elseBranch_(std::move(elseBranch)) {}
+
+    NodeType IfNode::getType() const
+    {
+        return NodeType::IF;
+    }
+
+    std::string IfNode::toString() const
+    {
+        std::ostringstream oss;
+        oss << "If (" << condition_->toString() << ") "
+            << "Then {" << thenBranch_->toString() << "} "
+            << "Else {" << elseBranch_->toString() << "}";
+        return oss.str();
+    }
+
     // Parser constructor
-    Parser::Parser(Lexer &lexer) : lexer(lexer), currentToken(lexer.GetNextToken()) {}
+    Parser::Parser(Lexer &lexer) : lexer_(lexer), currentToken_(lexer.GetNextToken()) {}
 
     // Main parsing function
     std::unique_ptr<ASTNode> Parser::parse()
     {
         std::vector<std::unique_ptr<ASTNode>> statements;
-        while(currentToken.type != TokenType::END_OF_FILE)
+        while (currentToken_.type_ != TokenType::END_OF_FILE)
         {
             statements.push_back(parseExpression());
         }
@@ -207,69 +288,164 @@ namespace Shattang::MyLisp
     // Parsing expressions
     std::unique_ptr<ASTNode> Parser::parseExpression()
     {
-        // Check if the expression starts with an opening parenthesis
-        if (currentToken.type == TokenType::OPEN_PAREN)
+        int openParenCount = 0;
+
+        // Unwrap nested parentheses
+        while (currentToken_.type_ == TokenType::OPEN_PAREN)
         {
             consume(TokenType::OPEN_PAREN);
+            openParenCount++;
+        }
 
-            if (currentToken.type == TokenType::SYMBOL)
+        // Parse the actual expression after unwrapping
+        std::unique_ptr<ASTNode> expr;
+        if (currentToken_.type_ == TokenType::SYMBOL)
+        {
+            if (currentToken_.value_ == "let")
             {
-                if (currentToken.value == "let")
-                {
-                    auto letNode = parseLet();
-                    consume(TokenType::CLOSE_PAREN); // Consume closing parenthesis for let expression
-                    return letNode;
-                }
-                else if (currentToken.value == "define")
-                {
-                    auto defineNode = parseDefine();
-                    consume(TokenType::CLOSE_PAREN); // Consume closing parenthesis for define expression
-                    return defineNode;
-                }
-                else
-                {
-                    auto functionCallNode = parseFunctionCall();
-                    consume(TokenType::CLOSE_PAREN); // Consume closing parenthesis for function call
-                    return functionCallNode;
-                }
+                expr = parseLet();
+            }
+            else if (currentToken_.value_ == "define")
+            {
+                expr = parseDefine();
+            }
+            else if (currentToken_.value_ == "set")
+            {
+                expr = parseSet();
+            }
+            else if (currentToken_.value_ == "for")
+            {
+                expr = parseForIteration();
+            }
+            else if (currentToken_.value_ == "while")
+            {
+                expr = parseWhileIteration();
+            }
+            else if (currentToken_.value_ == "if")
+            {
+                expr = parseIf();
+            }
+            else if (openParenCount > 0)
+            {
+                expr = parseFunctionCall();
             }
             else
             {
-                auto atomNode = parseAtom();
-                consume(TokenType::CLOSE_PAREN); // Consume closing parenthesis for single atom expression
-                return atomNode;
+                expr = parseAtom();
             }
         }
+        else
+        {
+            expr = parseAtom();
+        }
 
-        // If not an open parenthesis, assume it's a standalone atom
-        return parseAtom();
+        // Consume the matching number of closing parentheses
+        while (openParenCount > 0 && currentToken_.type_ == TokenType::CLOSE_PAREN)
+        {
+            consume(TokenType::CLOSE_PAREN);
+            openParenCount--;
+        }
+
+        // If there are still unclosed opening parentheses, it should be an error
+        if (openParenCount != 0)
+        {
+            throwError("Mismatched parentheses: more opening than closing parentheses.");
+        }
+
+        return expr;
+    }
+
+    std::unique_ptr<ASTNode> Parser::parseIf()
+    {
+        consume(TokenType::SYMBOL); // Consume `if`
+
+        auto condition = parseExpression();  // Parse the condition
+        auto thenBranch = parseExpression(); // Parse the then-branch
+        auto elseBranch = parseExpression(); // Parse the else-branch
+
+        return std::make_unique<IfNode>(std::move(condition), std::move(thenBranch), std::move(elseBranch));
+    }
+
+    std::unique_ptr<ASTNode> Parser::parseForIteration()
+    {
+        consume(TokenType::SYMBOL); // Consume `for`
+
+        if (currentToken_.type_ != TokenType::SYMBOL)
+        {
+            throwError("Expected an index variable name after 'for'");
+        }
+        std::string index = std::string(currentToken_.value_);
+        consume(TokenType::SYMBOL);
+
+        auto start_ = parseExpression(); // Parse the start expression
+        auto end_ = parseExpression();   // Parse the end expression
+        auto step_ = parseExpression();  // Parse the step expression
+
+        std::vector<std::unique_ptr<ASTNode>> body_;
+        while (currentToken_.type_ != TokenType::CLOSE_PAREN)
+        {
+            body_.push_back(parseExpression()); // Parse each expression in the loop body
+        }
+
+        return std::make_unique<ForIterationNode>(index, std::move(start_), std::move(end_), std::move(step_), std::move(body_));
+    }
+
+    std::unique_ptr<ASTNode> Parser::parseWhileIteration()
+    {
+        consume(TokenType::SYMBOL); // Consume `while`
+
+        auto condition = parseExpression(); // Parse the condition
+
+        std::vector<std::unique_ptr<ASTNode>> body;
+        while (currentToken_.type_ != TokenType::CLOSE_PAREN)
+        {
+            body.push_back(parseExpression()); // Parse each expression in the loop body
+        }
+
+        return std::make_unique<WhileIterationNode>(std::move(condition), std::move(body));
+    }
+
+    std::unique_ptr<ASTNode> Parser::parseSet()
+    {
+        consume(TokenType::SYMBOL); // Consume `set`
+
+        if (currentToken_.type_ != TokenType::SYMBOL)
+        {
+            throwError("Expected a variable name after 'set'");
+        }
+        std::string variableName = std::string(currentToken_.value_);
+        consume(TokenType::SYMBOL);
+
+        std::unique_ptr<ASTNode> valueNode = parseExpression(); // Parse the new value
+
+        return std::make_unique<VariableAssignmentNode>(variableName, std::move(valueNode));
     }
 
     // Parsing atomic expressions
     std::unique_ptr<ASTNode> Parser::parseAtom()
     {
-        auto doParse = [this](TokenType type, std::unique_ptr<ASTNode>&& node)
+        auto doParse = [this](TokenType type, std::unique_ptr<ASTNode> &&node)
         {
             consume(type);
             return std::move(node);
         };
 
-        switch (currentToken.type)
+        switch (currentToken_.type_)
         {
         case TokenType::SYMBOL:
-            return doParse(currentToken.type, std::make_unique<SymbolNode>(std::string(currentToken.value)));
+            return doParse(currentToken_.type_, std::make_unique<SymbolNode>(std::string(currentToken_.value_)));
         case TokenType::INTEGER:
-            return doParse(currentToken.type, std::make_unique<IntegerNode>(std::stol(std::string(currentToken.value))));
+            return doParse(currentToken_.type_, std::make_unique<IntegerNode>(std::stol(std::string(currentToken_.value_))));
         case TokenType::FLOAT:
-            return doParse(currentToken.type, std::make_unique<FloatNode>(std::stod(std::string(currentToken.value))));
+            return doParse(currentToken_.type_, std::make_unique<FloatNode>(std::stod(std::string(currentToken_.value_))));
         case TokenType::BOOL_TRUE:
-            return doParse(currentToken.type, std::make_unique<BooleanNode>(true));
+            return doParse(currentToken_.type_, std::make_unique<BooleanNode>(true));
         case TokenType::BOOL_FALSE:
-            return doParse(currentToken.type, std::make_unique<BooleanNode>(false));
+            return doParse(currentToken_.type_, std::make_unique<BooleanNode>(false));
         case TokenType::STRING:
-            return doParse(currentToken.type, std::make_unique<StringNode>(std::string(currentToken.value)));
+            return doParse(currentToken_.type_, std::make_unique<StringNode>(std::string(currentToken_.value_)));
         default:
-            throwError("Unexpected token: " + TokenTypeToString(currentToken.type));
+            throwError("Unexpected token: " + TokenTypeToString(currentToken_.type_));
         }
         return nullptr;
     }
@@ -280,18 +456,18 @@ namespace Shattang::MyLisp
         consume(TokenType::SYMBOL); // Consume `let`
 
         consume(TokenType::OPEN_PAREN); // Consume opening parenthesis for variable declaration
-        if (currentToken.type != TokenType::SYMBOL)
+        if (currentToken_.type_ != TokenType::SYMBOL)
         {
             throwError("Expected a variable name after 'let'");
         }
-        std::string varName = std::string(currentToken.value);
+        std::string varName = std::string(currentToken_.value_);
         consume(TokenType::SYMBOL);
 
-        if (currentToken.type != TokenType::SYMBOL)
+        if (currentToken_.type_ != TokenType::SYMBOL)
         {
             throwError("Expected a type after variable name");
         }
-        std::unique_ptr<SymbolNode> typeNode = std::make_unique<SymbolNode>(std::string(currentToken.value));
+        std::unique_ptr<SymbolNode> typeNode = std::make_unique<SymbolNode>(std::string(currentToken_.value_));
         consume(TokenType::SYMBOL);
         consume(TokenType::CLOSE_PAREN); // Consume closing parenthesis for variable declaration
 
@@ -303,32 +479,37 @@ namespace Shattang::MyLisp
     // Parsing function definitions
     std::unique_ptr<ASTNode> Parser::parseDefine()
     {
+        if (isParsingDefine_)
+            throwError("Nested function definition not supported");
+
+        isParsingDefine_ = true;
+
         consume(TokenType::SYMBOL); // Consume `define`
 
-        if (currentToken.type != TokenType::SYMBOL)
+        if (currentToken_.type_ != TokenType::SYMBOL)
         {
             throwError("Expected a function name after 'define'");
         }
-        std::string funcName = std::string(currentToken.value);
+        std::string funcName = std::string(currentToken_.value_);
         consume(TokenType::SYMBOL);
 
         std::vector<Parameter> parameters;
         consume(TokenType::OPEN_PAREN); // Consume the opening parenthesis for parameter list
-        while (currentToken.type != TokenType::CLOSE_PAREN)
+        while (currentToken_.type_ != TokenType::CLOSE_PAREN)
         {
             consume(TokenType::OPEN_PAREN); // Consume the opening parenthesis for each parameter
-            if (currentToken.type != TokenType::SYMBOL)
+            if (currentToken_.type_ != TokenType::SYMBOL)
             {
                 throwError("Expected a parameter name");
             }
-            std::string paramName = std::string(currentToken.value);
+            std::string paramName = std::string(currentToken_.value_);
             consume(TokenType::SYMBOL);
 
-            if (currentToken.type != TokenType::SYMBOL)
+            if (currentToken_.type_ != TokenType::SYMBOL)
             {
                 throwError("Expected a parameter type");
             }
-            auto paramType = std::make_unique<SymbolNode>(std::string(currentToken.value));
+            auto paramType = std::make_unique<SymbolNode>(std::string(currentToken_.value_));
             consume(TokenType::SYMBOL);
             consume(TokenType::CLOSE_PAREN); // Consume the closing parenthesis for each parameter
 
@@ -336,34 +517,35 @@ namespace Shattang::MyLisp
         }
         consume(TokenType::CLOSE_PAREN); // Consume the closing parenthesis for the parameter list
 
-        if (currentToken.type != TokenType::SYMBOL)
+        if (currentToken_.type_ != TokenType::SYMBOL)
         {
             throwError("Expected a return type for the function");
         }
-        auto returnType = std::make_unique<SymbolNode>(std::string(currentToken.value));
+        auto returnType = std::make_unique<SymbolNode>(std::string(currentToken_.value_));
         consume(TokenType::SYMBOL);
 
         std::vector<std::unique_ptr<ASTNode>> body;
-        while (currentToken.type != TokenType::CLOSE_PAREN)
+        while (currentToken_.type_ != TokenType::CLOSE_PAREN)
         {
             body.push_back(parseExpression());
         }
-        
+
+        isParsingDefine_ = false;
         return std::make_unique<FunctionDeclarationNode>(funcName, std::move(parameters), std::move(returnType), std::move(body));
     }
 
     // Parsing function calls
     std::unique_ptr<ASTNode> Parser::parseFunctionCall()
     {
-        if (currentToken.type != TokenType::SYMBOL)
+        if (currentToken_.type_ != TokenType::SYMBOL)
         {
             throwError("Expected a function name");
         }
-        std::string funcName = std::string(currentToken.value);
+        std::string funcName = std::string(currentToken_.value_);
         consume(TokenType::SYMBOL);
 
         std::vector<std::unique_ptr<ASTNode>> arguments;
-        while (currentToken.type != TokenType::CLOSE_PAREN)
+        while (currentToken_.type_ != TokenType::CLOSE_PAREN)
         {
             arguments.push_back(parseExpression());
         }
@@ -374,16 +556,16 @@ namespace Shattang::MyLisp
     // Consuming expected tokens and error handling
     void Parser::consume(TokenType expectedType)
     {
-        if (currentToken.type == expectedType)
+        if (currentToken_.type_ == expectedType)
         {
-            currentToken = lexer.GetNextToken();
+            currentToken_ = lexer_.GetNextToken();
         }
         else
         {
             std::ostringstream oss;
             oss << "Unexpected token: expected " << TokenTypeToString(expectedType)
-                << ", but got " << TokenTypeToString(currentToken.type) << " '" << currentToken.value << "'"
-                << " at line " << currentToken.line << ", column " << currentToken.column;
+                << ", but got " << TokenTypeToString(currentToken_.type_) << " '" << currentToken_.value_ << "'"
+                << " at line " << currentToken_.line_ << ", column " << currentToken_.column_;
             throw std::runtime_error(oss.str());
         }
     }
@@ -392,12 +574,13 @@ namespace Shattang::MyLisp
     {
         std::ostringstream oss;
         oss << "Parse error: " << message
-            << " at line " << currentToken.line
-            << ", column " << currentToken.column;
+            << " at line " << currentToken_.line_
+            << ", column " << currentToken_.column_
+            << ": '" << currentToken_.value_ << "'";
         throw std::runtime_error(oss.str());
     }
 
-    void ASTNode::visit(ASTVisitor &visit)
+    void ASTNode::visit(ASTVisitor &visit) const
     {
         visit.visit(*this);
     }

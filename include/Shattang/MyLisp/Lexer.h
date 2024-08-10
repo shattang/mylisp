@@ -21,11 +21,11 @@ namespace Shattang::MyLisp
 
     struct Token
     {
-        TokenType type;
-        std::string_view value;
-        int line;
-        int column;
-        std::string error;
+        TokenType type_;
+        std::string_view value_;
+        int line_;
+        int column_;
+        std::string error_;
 
         std::string ToString() const;
     };

@@ -38,14 +38,14 @@ namespace Shattang::MyLisp
     std::string Token::ToString() const
     {
         std::ostringstream oss;
-        oss << "Type: " << TokenTypeToString(type)
-            << ", Value: " << value
-            << ", Line: " << line
-            << ", Column: " << column;
+        oss << "Type: " << TokenTypeToString(type_)
+            << ", Value: " << value_
+            << ", Line: " << line_
+            << ", Column: " << column_;
 
-        if (!error.empty())
+        if (!error_.empty())
         {
-            oss << ", Error: " << error;
+            oss << ", Error: " << error_;
         }
 
         return oss.str();
@@ -83,7 +83,7 @@ namespace Shattang::MyLisp
             {
                 return handleNumber();
             }
-            if (std::isalpha(currentChar))
+            if (std::isalpha(currentChar) || currentChar == '_')
             {
                 return handleAlpha();
             }
@@ -271,7 +271,7 @@ namespace Shattang::MyLisp
         {
             token = lexer.GetNextToken();
             tokens.push_back(token);
-        } while (token.type != TokenType::END_OF_FILE && token.type != TokenType::ERROR);
+        } while (token.type_ != TokenType::END_OF_FILE && token.type_ != TokenType::ERROR);
 
         return tokens;
     }
