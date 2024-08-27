@@ -5,6 +5,9 @@ add_library(MyLisp STATIC
 	ASTPrettyPrinter.cpp
 	TypeSystem.cpp
 	Environment.cpp
+	Function.cpp
+	ASTEvaluator.cpp
+	UserDefinedFunction.cpp
 )
 
 # Target properties for MyLisp
